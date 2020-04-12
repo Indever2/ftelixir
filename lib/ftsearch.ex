@@ -1,5 +1,5 @@
 defmodule Ftelixir do
-  @word_backroll_rate 0.75
+  @word_backroll_rate 0.6
   def add_to_index(key, text) do
     prepared = prepare_string(text)
 
@@ -46,11 +46,11 @@ defmodule Ftelixir do
   end
 
   def search(string) do
-    search(string, plus_rate: 0.75, minus_rate: 0.60)
+    search(string, plus_rate: 0.8, minus_rate: 0.65)
   end
   def search(string, params) when is_binary(string) and is_list(params) do
-    plus_rate = Keyword.get(params, :plus_rate, 0.75)
-    minus_rate = Keyword.get(params, :minus_rate, 0.75)
+    plus_rate = Keyword.get(params, :plus_rate, 0.8)
+    minus_rate = Keyword.get(params, :minus_rate, 0.8)
 
     prepare_string_escape_minus(string)
       |> Enum.map(fn word ->
@@ -119,20 +119,50 @@ defmodule Ftelixir do
     end
   end
 
-  defp weight_f(x, y) when x <= y do
-    case x - y do
-      0 ->
-        1
-      1 ->
-        0.95
-      2 ->
-        0.88
-      _ ->
-        x / y
+  defp weight_f(x, x), do: 1
+  defp weight_f(x, y) when x >= y do
+    diff = x - y
+    divide = x / y
+    cond do
+      x > 8 ->
+        case diff do
+          1 ->
+            0.98
+          2 ->
+            0.91
+          3 ->
+            0.86
+          4 ->
+            0.8
+          _ ->
+            divide
+        end
+      x > 5 ->
+        case diff do
+          1 ->
+            0.95
+          2 ->
+            0.85
+          3 ->
+            0.76
+          _ ->
+            divide
+        end
+      x > 3 ->
+        case diff do
+          1 ->
+            0.9
+          2 ->
+            0.78
+          _ ->
+            divide
+        end
+      true ->
+        divide
     end
   end
 
-  def lookup_word(word) do
+  def lookup_word(word) do # ремонтный
     upcased = String.upcase(word)
     word_len = String.length(upcased)
 
@@ -140,7 +170,7 @@ defmodule Ftelixir do
     |> Enum.reduce(
       [],
       fn len, acc ->
-        acc ++ [ {String.slice(upcased, 0..(len - 1)), weight_f(len, word_len)} ]
+        acc ++ [ {String.slice(upcased, 0..(len - 1)), weight_f(word_len, len)} ]
       end
     )
     |> Enum.reduce(
@@ -151,14 +181,21 @@ defmodule Ftelixir do
             [] ->
               acc
             [{^word, matches}] ->
+              min = fn x, y -> if x >= y do
+                  y
+                else
+                  x
+                end
+              end
+
               Enum.reduce(
                 matches, acc,
                 fn {key, match_coff}, sub_acc ->
                   case Map.has_key?(sub_acc, key) do
-                    false -> Map.put_new(sub_acc, key, coff * match_coff)
+                    false -> Map.put_new(sub_acc, key, min.(coff, match_coff))
                     true ->
-                      if sub_acc[key] < (coff * match_coff) do
-                        %{sub_acc | key => (coff * match_coff)}
+                      if sub_acc[key] < min.(coff, match_coff) do
+                        %{sub_acc | key => min.(coff, match_coff)}
                       else
                         sub_acc
                       end
@@ -184,7 +221,7 @@ defmodule Ftelixir do
     |> Enum.reduce(
       [],
       fn len, acc ->
-        acc ++ [ {String.slice(word, 0..(len - 1)), weight_f(len, word_len)} ]
+        acc ++ [ {String.slice(word, 0..(len - 1)), weight_f(word_len, len)} ]
       end
     )
   end
