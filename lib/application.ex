@@ -3,7 +3,7 @@ defmodule Ftelixir.Application do
 
   def start(_type, _args) do
     children = [
-      Ftelixir.Engine
+      Ftelixir.IndexManager
     ]
 
     opts = [strategy: :one_for_one, name: Ftelixir.Supervisor]

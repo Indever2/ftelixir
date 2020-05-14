@@ -27,6 +27,7 @@ elixir_ftsearch-*.tar
 .formatter.exs
 
 # Ignore tables files
+indexes
 *table
 
 # Ignore mix.lock
