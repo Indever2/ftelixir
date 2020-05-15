@@ -12,7 +12,7 @@ defmodule Ftelixir.IndexManager do
         [%{id: :default, start: {Ftelixir.Engine, :start_link, [%{name: :default}]}}]
       index_list ->
         for {index_name} <- index_list do
-          %{id: :index_name, start: {Ftelixir.Engine, :start_link, [%{name: index_name}]}}
+          %{id: index_name, start: {Ftelixir.Engine, :start_link, [%{name: index_name}]}}
         end
     end
 
