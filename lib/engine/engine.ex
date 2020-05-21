@@ -30,7 +30,7 @@ defmodule Ftelixir.Engine do
   end
 
   def start_link(%{name: name} = opts) when is_map(opts) do
-    Logger.info("Starting the engine: #{inspect name}")
+    Logger.info("[#{__MODULE__}] Starting the engine: #{inspect name}")
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 

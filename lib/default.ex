@@ -23,7 +23,7 @@ defmodule Ftelixir.Default do
   sliced words (eg Transform -> [transform, transfor, transfo, transf]), len for every sliced word
   and position in document.
   ## Examples
-    Ftelixir.add_to_index(1, "I love that transformation so much!")
+    Ftelixir.add_to_index(1, "I love that transformation so much!", %{}) # the last argument is index info struct
     [
       {"I", {1, 0}},
       {"LOVE", {4, 1}},
@@ -41,14 +41,21 @@ defmodule Ftelixir.Default do
       {"MUC", {3, 5}}
     ]
   """
-  def add_function_default(words) when is_list(words) do
+  def add_function_default(words, index_info) when is_list(words) do
+    slice_f = case index_info do
+      %{autocomplete: true} ->
+        fn word -> slice_autocomplete(word) end
+      _ ->
+        fn word -> slice(word) end
+    end
+
     {words, _words_count} = Enum.reduce(words, {[], 0},
     fn word, {acc_words, word_position} ->
     {acc_words ++ [{word, word_position}], word_position + 1}
     end)
 
     Enum.reduce(words, [], fn {word, pos}, acc ->
-      acc ++ Enum.map(slice(word), &({&1, {String.length(&1), pos}})) # list of tuples {"word", {WORD_MATCH_SCORE, WORD_POSITION_IN_DOCUMENT}}
+      acc ++ Enum.map(slice_f.(word), &({&1, {String.length(&1), pos}})) # list of tuples {"word", {WORD_MATCH_SCORE, WORD_POSITION_IN_DOCUMENT}}
     end)
   end
 
@@ -67,7 +74,20 @@ defmodule Ftelixir.Default do
     end
   end
 
-  def search_function_default(index_name, words_to_lookup) when is_atom(index_name) do
+  def slice_autocomplete(word) do
+    do_slice = fn (word, range) -> Enum.map(range, fn i -> String.slice(word, Range.new(0, i)) end) end
+    do_slice.(word, 0..String.length(word))
+  end
+
+  def search_function_default(index_name, words_to_lookup, properties)
+  when is_atom(index_name) and is_list(properties) do
+    take_func = case Keyword.get(properties, :max, 100) do
+      :all ->
+        &(&1)
+      val ->
+        fn enum -> Enum.take(enum, val) end
+    end
+
     # Block 1: getting the results!
     # =============================
     scores_map =
@@ -76,6 +96,7 @@ defmodule Ftelixir.Default do
       main_acc ++
       Enum.reduce(slice(word), [], fn subword, acc -> acc ++ Ftelixir.Engine.lookup(index_name, subword) end)
     end)
+
     # Block 2: calculating scores!
     # =============================
     |> Enum.reduce(%{},
@@ -119,20 +140,20 @@ defmodule Ftelixir.Default do
       acc ++ [match]
     end)
 
+    sorted_and_filtered =
+      Enum.sort(results, &(&1.score >= &2.score))
+      |> take_func.()
+
     total =
       %{
-        results: length(results),
+        results: length(sorted_and_filtered),
         max_score: if results != [] do
-          Enum.map(results, fn x -> x.score end)
+          Enum.map(sorted_and_filtered, fn x -> x.score end)
           |> Enum.max
         else
           nil
         end,
-        matches: if results != [] do
-          Enum.sort(results, &(&1.score >= &2.score))
-        else
-          []
-        end
+        matches: sorted_and_filtered
       }
     total
   end
