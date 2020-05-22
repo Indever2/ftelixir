@@ -88,13 +88,32 @@ defmodule Ftelixir.Default do
         fn enum -> Enum.take(enum, val) end
     end
 
+    repeats_reduce_func =
+      fn {id, {_score, _position}} = result, map ->
+        Map.put(map, id, result)
+      end
+
+    lookup_func =
+      fn subword, acc ->
+        result = Ftelixir.Engine.lookup(index_name, subword)
+        case result do
+          [] ->
+            {:cont, acc}
+          _ ->
+            {:halt, result}
+        end
+      end
+
     # Block 1: getting the results!
     # =============================
     scores_map =
     Enum.reduce(words_to_lookup, [],
     fn word, main_acc ->
       main_acc ++
-      Enum.reduce(slice(word), [], fn subword, acc -> acc ++ Ftelixir.Engine.lookup(index_name, subword) end)
+      Enum.reduce_while(slice(word), [], lookup_func)
+    end)
+    |> Enum.map(fn {word, results} ->
+      {word, Enum.reduce(results, %{}, repeats_reduce_func) |> Map.values() }
     end)
 
     # Block 2: calculating scores!
