@@ -76,10 +76,10 @@ defmodule Ftelixir.Default do
 
   def slice_autocomplete(word) do
     do_slice = fn (word, range) -> Enum.map(range, fn i -> String.slice(word, Range.new(0, i)) end) end
-    do_slice.(word, 0..String.length(word))
+    do_slice.(word, 0..String.length(word) - 1)
   end
 
-  def search_function_default(index_name, words_to_lookup, properties)
+  def search_function_default(index_name, words_to_lookup, options, properties)
   when is_atom(index_name) and is_list(properties) do
     take_func = case Keyword.get(properties, :max, 100) do
       :all ->
@@ -95,7 +95,12 @@ defmodule Ftelixir.Default do
 
     lookup_func =
       fn subword, acc ->
-        result = Ftelixir.Engine.lookup(index_name, subword)
+        result =
+          if is_nil(options) do
+            Ftelixir.Engine.lookup(index_name, subword)
+          else
+            Ftelixir.Engine.lookup(index_name, subword, options)
+          end
         case result do
           [] ->
             {:cont, acc}

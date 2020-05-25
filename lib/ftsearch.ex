@@ -12,11 +12,14 @@ defmodule Ftelixir do
   # ============================================================
   # Programming interface section
   # ============================================================
-  def add_to_index(key, text), do: add_to_index(Ftelixir, :default, key, text)
-  def add_to_index(index_name, key, text) when is_atom(index_name) do
-    add_to_index(Ftelixir, index_name, key, text)
-  end
-  def add_to_index(module, index_name, key, text) do
+
+  def add_to_index(key, text), do: add_to_index(key, text, nil, nil, nil)
+  def add_to_index(key, text, property), do: add_to_index(key, text, property, nil, nil)
+  def add_to_index(key, text, property, index), do: add_to_index(key, text, property, index, nil)
+  def add_to_index(key, text, property, index_name, module) do
+    index_name = default_if_nil(index_name, :default)
+    module = default_if_nil(module, Ftelixir)
+
     index = get_index_info! (index_name)
 
     filtered = try do
@@ -31,23 +34,18 @@ defmodule Ftelixir do
       _ in UndefinedFunctionError -> add_function_default(filtered, index)
     end
 
-    Ftelixir.Engine.add_record(index_name, key, index_list)
+    Ftelixir.Engine.add_record(index_name, key, property, index_list)
   end
 
-  def search(text) do
-    search(Ftelixir, :default, text)
-  end
-  def search(index_name, text) when is_atom(index_name) do
-    search(Ftelixir, index_name, text)
-  end
-  def search(index_name, text, properties) when is_atom(index_name) and is_list(properties) do
-    search(Ftelixir, index_name, text, properties)
-  end
-  def search(module, index_name, text) when is_atom(index_name) do
-    search(module, index_name, text, Keyword.new())
-  end
-  def search(module, index_name, text, properties)
-  when is_atom(index_name) and is_list(properties) do
+  def search(text), do: search(text, nil, nil, nil, nil)
+  def search(text, options), do: search(text, options, nil, nil, nil)
+  def search(text, options, properties) when is_list(properties), do: search(text, options, properties, nil, nil)
+  def search(text, options, properties, index_name), do: search(text, options, properties, index_name, nil)
+  def search(text, options, properties, index_name, module) do
+    properties = default_if_nil(properties, Keyword.new())
+    index_name = default_if_nil(index_name, :default)
+    module = default_if_nil(module, Ftelixir)
+
     get_index_info! (index_name)
 
     filtered = try do
@@ -59,7 +57,7 @@ defmodule Ftelixir do
     result = try do
       apply(module, :search_function, [filtered])
      rescue
-      _ in UndefinedFunctionError -> search_function_default(index_name, filtered, properties)
+      _ in UndefinedFunctionError -> search_function_default(index_name, filtered, options, properties)
     end
 
     result
@@ -101,6 +99,14 @@ defmodule Ftelixir do
         raise "Index #{inspect index_name} does not exists!"
       %{name: ^index_name} = index ->
         index
+    end
+  end
+
+  def default_if_nil(value, default) do
+    if is_nil(value) do
+      default
+    else
+      value
     end
   end
 end
